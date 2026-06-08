@@ -1,0 +1,547 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>CIB Validation</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{--bg:#0f1a20;--panel:#1c2b33;--panel2:#243640;--input:#0d222f;
+      --border:#2d3e46;--text:#e1e7ea;--muted:#8b9faa;--accent:#66b0ff;
+      --good:#2e8540;--model:#b39dff;--suggest:#6aa9ff;--mixed:#7be1c6;
+      --delayed:#56d4a0;--unexpected:#ff8a7a;--prompting:#ffd479;--pre:#8b9faa}
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--text);
+         font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    /* size set dynamically via JS */
+    header{background:var(--panel);border-bottom:2px solid var(--border);padding:12px 24px;
+           display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:10;flex-wrap:wrap}
+    header h1{margin:0;color:var(--accent)}
+    .hdr-sub{color:var(--muted);font-size:0.85em;margin-left:auto}
+    .sz-btn{background:var(--panel2);color:var(--text);border:1px solid var(--border);
+            border-radius:0.3em;cursor:pointer;font-weight:700;line-height:1;font-size:1em}
+    .sz-btn:hover{background:var(--accent);color:#0f1a20}
+    main{max-width:1100px;margin:0 auto;padding:20px 24px 100px}
+
+    /* List view cards */
+    .card{background:var(--panel);border-radius:10px;margin-bottom:10px;
+          border-left:4px solid var(--border);cursor:pointer;transition:background 0.15s}
+    .card:hover{background:var(--panel2)}
+    .card a{display:flex;align-items:center;gap:10px;padding:14px 18px;
+            text-decoration:none;color:inherit;flex-wrap:wrap}
+    .card .type{font-weight:700;text-transform:uppercase;font-size:1em}
+    .card .time{color:var(--muted);font-variant-numeric:tabular-nums;font-size:0.9em}
+    .card .desc{color:var(--muted);font-size:0.85em;flex:1}
+    .card .arrow{color:var(--muted);font-size:18px;margin-left:auto}
+    .src-tag{font-size:10px;padding:1px 6px;border-radius:3px;font-weight:600}
+    .src-tag.gt{background:rgba(102,176,255,0.15);color:var(--accent)}
+    .src-tag.gm{background:rgba(179,157,255,0.15);color:var(--model)}
+
+    /* Single segment view */
+    .seg-hero{background:var(--panel);border-radius:10px;padding:16px 20px;
+              margin-bottom:16px;border-left:4px solid var(--border)}
+    .seg-hero .type{font-weight:700;text-transform:uppercase;font-size:16px}
+    .seg-hero .time{color:var(--muted);font-variant-numeric:tabular-nums;margin-left:10px}
+    .seg-hero .reason{color:var(--muted);font-size:0.85em;margin-top:4px;font-style:italic}
+
+    video{width:100%;display:block;max-height:55vh;background:#000;border-radius:10px;margin-bottom:14px}
+
+    .chunk-row{display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+    .chunk-progress{display:flex;gap:3px}
+    .csq{width:24px;height:7px;border-radius:2px;background:#222;border:1px solid #333}
+    .csq.done{background:var(--accent);border-color:var(--accent)}
+    .csq.cur{background:#fff;border-color:#fff}
+    .cbtn{background:var(--panel2);color:var(--text);border:1px solid var(--border);
+          border-radius:5px;padding:5px 14px;font-size:0.85em;font-weight:600;cursor:pointer}
+    .cbtn:hover:not(:disabled){background:var(--bg)}
+    .cbtn:disabled{opacity:0.35;cursor:default}
+    .cbtn.replay{background:var(--accent);color:#0f1a20;border-color:var(--accent)}
+    .clabel{color:var(--muted);font-size:0.85em}
+
+    .analyze-row{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+    .abtn{background:var(--accent);color:#0f1115;border:0;border-radius:6px;
+          padding:0.6em 1.4em;font-weight:700;font-size:1em;cursor:pointer}
+    .abtn:disabled{opacity:0.5;cursor:default}
+    .astatus{color:var(--muted);font-size:0.9em}
+    .spin{display:inline-block;width:14px;height:14px;border:2px solid var(--border);
+          border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;
+          vertical-align:middle;margin-left:6px}
+    @keyframes sp{to{transform:rotate(360deg)}}
+
+    .score-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px}
+    .score-cell{background:var(--bg);border-radius:6px;padding:8px}
+    .score-cell .label{color:var(--muted);font-size:0.75em;text-transform:uppercase}
+    .score-cell .value{font-weight:700;font-size:1.5em}
+    .score-cell .sub{color:var(--muted);font-size:0.75em}
+    .ch-block{padding:0.6em 0;border-top:1px solid var(--border);font-size:0.9em}
+    .ch-block .ch-head{display:flex;justify-content:space-between;margin-bottom:0.3em}
+    .ch-block strong{font-size:1em;color:var(--text)}
+    .ch-block .muted{color:var(--muted)}
+
+    .seg-nav{display:flex;justify-content:space-between;margin-top:24px;padding-top:16px;border-top:1px solid var(--border)}
+    .seg-nav a{color:var(--accent);text-decoration:none;font-weight:600;font-size:14px}
+    .seg-nav a:hover{text-decoration:underline}
+
+    /* Validation ratings */
+    .val-section{background:var(--panel);border-radius:10px;padding:16px 20px;margin-top:16px;
+                 border:1px solid var(--border)}
+    .val-section h3{margin:0 0 12px;font-size:14px;color:var(--accent);text-transform:uppercase}
+    .val-dim{margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border)}
+    .val-dim:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0}
+    .val-dim-label{font-weight:700;font-size:0.9em;margin-bottom:6px}
+    .val-btns{display:flex;gap:6px;margin-bottom:6px}
+    .vbtn{border:none;border-radius:8px;padding:0.5em 1em;font-size:0.9em;font-weight:700;
+          cursor:pointer;box-shadow:0 2px 8px #0003;transition:all 0.15s}
+    .vbtn.good{background:linear-gradient(90deg,#1f2d34 60%,#223344);color:#b6ccd8}
+    .vbtn.partial{background:linear-gradient(90deg,#1f2d34 60%,#223344);color:#b6ccd8}
+    .vbtn.bad{background:linear-gradient(90deg,#1f2d34 60%,#223344);color:#b6ccd8}
+    .vbtn.good:hover{background:linear-gradient(90deg,#43b76e 60%,var(--good));color:#fff;transform:scale(1.04)}
+    .vbtn.partial:hover{background:linear-gradient(90deg,#e0b84a 60%,#a8872a);color:#fff;transform:scale(1.04)}
+    .vbtn.bad:hover{background:linear-gradient(90deg,#e05a4a 60%,#b92b27);color:#fff;transform:scale(1.04)}
+    .vbtn.good.active{background:linear-gradient(90deg,var(--good) 60%,#236c33);color:#fff;
+                      outline:3px solid var(--good);box-shadow:0 0 16px #2e854088;transform:scale(1.07)}
+    .vbtn.partial.active{background:linear-gradient(90deg,#a8872a 60%,#7c6520);color:#fff;
+                         outline:3px solid #a8872a;box-shadow:0 0 16px #a8872a88;transform:scale(1.07)}
+    .vbtn.bad.active{background:linear-gradient(90deg,#b92b27 60%,#7c2323);color:#fff;
+                     outline:3px solid #b92b27;box-shadow:0 0 16px #b92b2788;transform:scale(1.07)}
+    .val-comment{width:100%;padding:6px 8px;border-radius:6px;border:none;background:var(--input);
+                 color:#fff;font-family:inherit;font-size:0.85em;min-height:40px;resize:vertical;margin-top:4px}
+
+    .export-bar{text-align:center;margin:30px 0}
+    .export-bar button{background:var(--good);color:#fff;border:0;border-radius:8px;
+                       padding:12px 32px;font-size:16px;font-weight:700;cursor:pointer}
+    .empty{color:var(--muted);font-style:italic;padding:40px;text-align:center}
+  </style>
+</head>
+<body>
+  <header>
+    <a id="back-link" href="index.html" style="color:var(--accent);text-decoration:none;font-size:0.85em">&larr; Back</a>
+    <h1 id="page-title" style="font-size:1.2em">CIB Validation — p01_s01</h1>
+    <div style="display:flex;align-items:center;gap:4px;margin-left:8px" title="Text size">
+      <button class="sz-btn" onclick="changeSize(-2)" style="padding:0.3em 0.6em;font-size:1em;font-weight:700">A-</button>
+      <span id="size-label" style="color:var(--muted);font-size:1em;min-width:2em;text-align:center">16</span>
+      <button class="sz-btn" onclick="changeSize(2)" style="padding:0.3em 0.6em;font-size:1em;font-weight:700">A+</button>
+    </div>
+    <span class="hdr-sub" id="hdr-sub"></span>
+  </header>
+  <main id="main">
+    <div style="background:var(--panel);border-radius:8px;padding:10px 16px;margin-bottom:16px;display:flex;align-items:center;gap:10px">
+      <label style="font-weight:600;font-size:0.9em">Annotator:</label>
+      <input id="aname" placeholder="Enter your name" style="background:var(--input);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 10px;width:200px;font-size:0.9em" />
+    </div>
+    <div id="empty" class="empty">Loading...</div>
+  </main>
+<script>
+const LABELS={pre_reading:"Pre-reading",jibo_model:"Model",jibo_suggest:"Suggest",
+  jibo_mixed:"Mixed",jibo_delayed:"Delayed",unexpected_event:"Unexpected",
+  parent_child_prompting_jibo:"Prompting Jibo",post_reading:"Post-reading"};
+const CM={pre_reading:"var(--pre)",jibo_model:"var(--model)",jibo_suggest:"var(--suggest)",
+  jibo_mixed:"var(--mixed)",jibo_delayed:"var(--delayed)",unexpected_event:"var(--unexpected)",
+  parent_child_prompting_jibo:"var(--prompting)",post_reading:"var(--pre)"};
+
+// Continuous font size — like Google Docs zoom
+let fontSize=parseInt(localStorage.getItem("val_font_size"))||16;
+function applySize(){
+  fontSize=Math.max(10,Math.min(80,fontSize));
+  document.body.style.fontSize=fontSize+"px";
+  document.body.style.lineHeight=(1.4+fontSize*0.01).toFixed(2);
+  // Brighten muted text at larger sizes for contrast
+  if(fontSize>=22){document.documentElement.style.setProperty("--muted","#c0d4e0");
+    document.documentElement.style.setProperty("--text","#f0f2f5")}
+  else{document.documentElement.style.setProperty("--muted","#8b9faa");
+    document.documentElement.style.setProperty("--text","#e1e7ea")}
+  const label=document.getElementById("size-label");
+  if(label)label.textContent=fontSize;
+  localStorage.setItem("val_font_size",fontSize);
+}
+function changeSize(delta){fontSize+=delta;applySize()}
+applySize();
+
+const params=new URLSearchParams(location.search);
+const qSeg=params.get("segment")?parseInt(params.get("segment")):null;
+const qSession=params.get("session")||null;
+
+let sessionId=null,segs=[],vlm={},vlmChunks={};
+
+// ---- localStorage persistence ----
+const STORE_KEY="cib_validation_p01_s01";
+function saveToStorage(){
+  const data={annotator:document.querySelector("#aname")?.value||"",
+    chunkValsAll:allChunkVals, segNotes:allSegNotes, timestamp:new Date().toISOString()};
+  try{localStorage.setItem(STORE_KEY,JSON.stringify(data))}catch(e){}
+}
+function loadFromStorage(){
+  try{const raw=localStorage.getItem(STORE_KEY);
+    if(raw){const d=JSON.parse(raw);
+      if(d.annotator){const el=document.querySelector("#aname");if(el)el.value=d.annotator}
+      if(d.chunkValsAll)Object.assign(allChunkVals,d.chunkValsAll);
+      if(d.segNotes)Object.assign(allSegNotes,d.segNotes);
+      return d}}catch(e){}return null}
+// Global storage for all segments' chunk validations and notes
+let allChunkVals={}; // "segId_chunkIdx" -> {ratings:[{channel,rating,comment},...]}
+let allSegNotes={};  // segId -> "notes text"
+
+function fmt(s){if(s==null||isNaN(s))return"";const t=Math.max(0,Math.floor(s));return Math.floor(t/60)+":"+String(t%60).padStart(2,"0")}
+function esc(s){return s==null?"":String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+
+// Restore saved progress
+loadFromStorage();
+// Auto-save annotator name
+document.getElementById("aname")?.addEventListener("input",()=>saveToStorage());
+
+(async()=>{
+  sessionId="p01_s01";
+
+  // Load from static JSON files
+  const r=await fetch("data/segments.json");
+  const d=await r.json();
+  if(!d.segments||!d.segments.length){document.getElementById("empty").textContent="No segments found.";return}
+  segs=d.segments;
+
+  // Load all chunk VLM results
+  const crResp=await fetch("data/chunk_results.json");
+  const allResults=await crResp.json();
+  for(const [key,data] of Object.entries(allResults)){
+    const parts=key.split("_");
+    const segId=parseInt(parts[0]);
+    const chunkIdx=parseInt(parts[1]);
+    if(!vlmChunks[segId])vlmChunks[segId]={};
+    vlmChunks[segId][chunkIdx]=normalizeVLM(data);
+  }
+
+  function normalizeVLM(raw){
+    // The test_prompts endpoint returns {results:{verbal:{result:{payload:{verbal_synchrony:{...}}}}},...}
+    // Flatten to {verbal_synchrony:{...}, affective_synchrony:{...}, ...} for rendering
+    const r=raw.results||raw;
+    const out={_raw:raw};
+    if(r.verbal?.result?.payload?.verbal_synchrony) out.verbal_synchrony=r.verbal.result.payload.verbal_synchrony;
+    if(r.affective?.result?.payload?.affective_synchrony) out.affective_synchrony=r.affective.result.payload.affective_synchrony;
+    if(r.motor?.result?.payload?.motor_synchrony) out.motor_synchrony=r.motor.result.payload.motor_synchrony;
+    if(r.robot?.result?.payload?.robot_intervention_effect) out.robot_intervention_effect=r.robot.result.payload.robot_intervention_effect;
+    // Also check if already flat (from direct API response)
+    if(raw.verbal_synchrony) out.verbal_synchrony=raw.verbal_synchrony;
+    if(raw.affective_synchrony) out.affective_synchrony=raw.affective_synchrony;
+    if(raw.motor_synchrony) out.motor_synchrony=raw.motor_synchrony;
+    if(raw.robot_intervention_effect) out.robot_intervention_effect=raw.robot_intervention_effect;
+    if(raw.dyadic_state) out.dyadic_state=raw.dyadic_state;
+    if(raw.clip_summary) out.clip_summary=raw.clip_summary;
+    if(raw.clip_narrative) out.clip_narrative=raw.clip_narrative;
+    // Schema errors / warnings
+    for(const ch of ["verbal","affective","motor","robot"]){
+      if(r[ch]?.schema_errors?.length) out[ch+"_schema_errors"]=r[ch].schema_errors;
+      if(r[ch]?.lang_warnings?.length) out[ch+"_lang_warnings"]=r[ch].lang_warnings;
+    }
+    return out;
+  }
+
+  document.getElementById("empty").style.display="none";
+
+  // Set back link based on view
+  const backLink=document.getElementById("back-link");
+  if(qSeg){
+    backLink.href="index.html"+(qSession?"?session="+encodeURIComponent(qSession):"");
+    backLink.textContent="\u2190 All segments";
+    renderSingleSegment(qSeg)}
+  else{renderList()}
+})();
+
+// ==== LIST VIEW ====
+function renderList(){
+  document.getElementById("page-title").textContent="CIB Validation — p01_s01";
+  const main=document.getElementById("main");
+  main.innerHTML='<p style="color:var(--muted);font-size:0.9em;margin-bottom:16px">Click a segment to open its validation view.</p>';
+  // Re-add annotator name bar (it gets cleared by innerHTML)
+  const nameBar=document.createElement("div");
+  nameBar.style.cssText="background:var(--panel);border-radius:8px;padding:10px 16px;margin-bottom:16px;display:flex;align-items:center;gap:10px";
+  nameBar.innerHTML='<label style="font-weight:600;font-size:0.9em">Annotator:</label>'+
+    '<input id="aname" placeholder="Enter your name" style="background:var(--input);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 10px;width:200px;font-size:0.9em" />';
+  main.insertBefore(nameBar,main.firstChild);
+  loadFromStorage(); // restore name
+  document.getElementById("aname")?.addEventListener("input",()=>saveToStorage());
+
+  segs.forEach(seg=>{
+    const card=document.createElement("div");card.className="card";
+    card.style.borderLeftColor=CM[seg.event_type]||"var(--border)";
+    const url="index.html?segment="+seg.id;
+
+    // Count validated chunks
+    const totalChunks=seg.chunks?seg.chunks.length:0;
+    let ratedChunks=0;
+    for(let ci=0;ci<totalChunks;ci++){
+      const key=seg.id+"_"+ci;
+      if(allChunkVals[key]&&allChunkVals[key].ratings?.some(r=>r.rating))ratedChunks++;
+    }
+    const isComplete=totalChunks>0&&ratedChunks===totalChunks;
+    const statusTag=isComplete
+      ?'<span style="color:var(--good);font-size:0.75em;font-weight:700">\u2713 complete</span>'
+      :ratedChunks>0
+        ?'<span style="color:var(--prompting);font-size:0.75em;font-weight:700">'+ratedChunks+'/'+totalChunks+' rated</span>'
+        :'';
+
+    card.innerHTML=
+      '<a href="'+url+'">'+
+        '<span class="type" style="color:'+CM[seg.event_type]+'">'+(LABELS[seg.event_type]||seg.event_type)+'</span>'+
+        '<span class="src-tag '+(seg.source==="clip_ground_truth"?"gt":"gm")+'">'+(seg.source==="clip_ground_truth"?"ground truth":"gemini")+'</span>'+
+        '<span class="time">'+fmt(seg.event_start_s)+' – '+fmt(seg.event_end_s)+'</span>'+
+        '<span class="desc">'+(seg.trim_reason||"")+'</span>'+
+        statusTag+
+        '<span class="arrow">\u203a</span>'+
+      '</a>';
+    main.appendChild(card);
+  });
+  // Export all
+  const exp=document.createElement("div");exp.className="export-bar";
+  exp.innerHTML='<button id="btn-export-all">Export All Results (JSON)</button>';
+  main.appendChild(exp);
+  document.getElementById("btn-export-all").addEventListener("click",exportAll);
+}
+
+// ==== SINGLE SEGMENT VIEW ====
+function renderSingleSegment(segId){
+  const seg=segs.find(s=>s.id===segId);
+  if(!seg){document.getElementById("main").innerHTML='<div class="empty">Segment not found.</div>';return}
+
+  document.getElementById("page-title").textContent=(LABELS[seg.event_type]||seg.event_type)+" — Segment "+seg.id;
+  document.getElementById("hdr-sub").textContent="Segment "+seg.id+" / "+segs.length;
+
+  const main=document.getElementById("main");main.innerHTML="";
+
+  // Hero card
+  const hero=document.createElement("div");hero.className="seg-hero";
+  hero.style.borderLeftColor=CM[seg.event_type]||"var(--border)";
+  hero.innerHTML=
+    '<span class="type" style="color:'+CM[seg.event_type]+'">'+(LABELS[seg.event_type]||seg.event_type)+'</span>'+
+    '<span class="src-tag '+(seg.source==="clip_ground_truth"?"gt":"gm")+'">'+(seg.source==="clip_ground_truth"?"ground truth":"gemini")+'</span>'+
+    '<span class="time">'+fmt(seg.event_start_s)+' – '+fmt(seg.event_end_s)+'</span>'+
+    '<span style="color:var(--muted);font-size:0.85em;margin-left:6px">('+Math.round(seg.segment_end_s-seg.segment_start_s)+'s segment)</span>'+
+    (seg.trim_reason?'<div class="reason">'+seg.trim_reason+'</div>':'')+
+    (seg.description&&seg.description!==seg.trim_reason?'<div style="margin-top:4px">'+seg.description+'</div>':'');
+  main.appendChild(hero);
+
+  // Trimmed video — served by /video_segment/<session>/<seg_id>
+  const vid=document.createElement("video");vid.id="vid";vid.controls=true;vid.preload="metadata";
+  vid.src="videos/p01_s01_seg"+seg.id+".mp4";
+  main.appendChild(vid);
+
+  // Chunk progress bar + auto-swapping results
+  const chunks=seg.chunks||[];
+  let activeChunk=-1;
+  // Use global allChunkVals keyed by "segId_chunkIdx"
+
+  // Chunk indicator
+  const chunkBar=document.createElement("div");chunkBar.className="chunk-row";chunkBar.id="chunk-bar";
+  main.appendChild(chunkBar);
+
+  // Results container (auto-swaps with video time)
+  const resDiv=document.createElement("div");resDiv.id="results";
+  main.appendChild(resDiv);
+
+  function renderChunkBar(ci){
+    let h='<div class="chunk-progress">';
+    for(let i=0;i<chunks.length;i++){
+      const hasDat=vlmChunks[seg.id]&&vlmChunks[seg.id][i];
+      h+='<div class="csq '+(i<ci?"done":i===ci?"cur":"")
+        +'" title="Chunk '+(i+1)+': '+fmt(chunks[i].start_s)+'–'+fmt(chunks[i].end_s)
+        +(hasDat?' (analyzed)':'')+'" style="cursor:pointer" data-ci="'+i+'"></div>';
+    }
+    h+='</div>';
+    h+='<span class="clabel">Chunk '+(ci+1)+'/'+chunks.length+' — '
+      +fmt(chunks[ci]?.start_s)+'–'+fmt(chunks[ci]?.end_s)+' (session time)</span>';
+    chunkBar.innerHTML=h;
+    // Click chunk square to jump
+    chunkBar.querySelectorAll(".csq").forEach(sq=>{
+      sq.addEventListener("click",()=>{
+        const i=parseInt(sq.dataset.ci);
+        const localT=chunks[i].start_s-seg.segment_start_s;
+        vid.currentTime=localT;vid.play().catch(()=>{});
+      });
+    });
+  }
+
+  function showChunkResults(ci){
+    if(ci===activeChunk)return;
+    // Save current validation before swapping
+    if(activeChunk>=0)saveChunkVal(activeChunk);
+    activeChunk=ci;
+    renderChunkBar(ci);
+    resDiv.innerHTML="";
+
+    const chunkData=(vlmChunks[seg.id]||{})[ci];
+    if(chunkData){
+      resDiv.appendChild(renderVLM(chunkData));
+    } else {
+      resDiv.innerHTML='<div style="color:var(--muted);padding:1em;text-align:center">'+
+        'No analysis for this chunk yet. Chunks are being analyzed in the background.</div>';
+    }
+
+    // Restore saved validation for this chunk
+    restoreChunkVal(ci);
+  }
+
+  function saveChunkVal(ci){
+    const key=seg.id+"_"+ci;
+    const ratings=[];
+    resDiv.querySelectorAll(".val-dim").forEach(row=>{
+      const active=row.querySelector(".vbtn.active");
+      const comment=row.querySelector(".val-comment")?.value||"";
+      const chBlock=row.closest(".ch-block");
+      const chLabel=chBlock?chBlock.querySelector("strong")?.textContent||"":"";
+      ratings.push({channel:chLabel,rating:active?active.textContent.trim():null,comment:comment});
+    });
+    if(ratings.length)allChunkVals[key]={ratings:ratings};
+    // Also save segment notes
+    const notesEl=document.getElementById("seg-notes");
+    if(notesEl)allSegNotes[seg.id]=notesEl.value;
+    saveToStorage();
+  }
+
+  function restoreChunkVal(ci){
+    const key=seg.id+"_"+ci;
+    const saved=allChunkVals[key];
+    if(!saved)return;
+    const dims=resDiv.querySelectorAll(".val-dim");
+    dims.forEach((row,i)=>{
+      if(saved.ratings[i]){
+        if(saved.ratings[i].rating){
+          row.querySelectorAll(".vbtn").forEach(b=>{
+            if(b.textContent.trim()===saved.ratings[i].rating)b.classList.add("active");
+          });
+        }
+        if(saved.ratings[i].comment){
+          const ta=row.querySelector(".val-comment");
+          if(ta)ta.value=saved.ratings[i].comment;
+        }
+      }
+    });
+  }
+
+  // Auto-swap: detect which chunk the video is in and swap results
+  vid.addEventListener("timeupdate",()=>{
+    const localT=vid.currentTime; // trimmed video, starts at 0
+    const sessionT=localT+seg.segment_start_s; // convert to session time
+    let ci=0;
+    for(let i=0;i<chunks.length;i++){
+      if(sessionT>=chunks[i].start_s)ci=i;
+    }
+    if(ci!==activeChunk)showChunkResults(ci);
+  });
+
+  // Initial display
+  if(chunks.length)showChunkResults(0);
+
+  // General notes
+  const notesDiv=document.createElement("div");notesDiv.className="val-section";
+  const notesH=document.createElement("h3");notesH.textContent="General Notes";notesDiv.appendChild(notesH);
+  const notesTa=document.createElement("textarea");notesTa.className="val-comment";notesTa.id="seg-notes";
+  notesTa.style.minHeight="80px";
+  notesTa.placeholder="Any observations about this segment — what stood out, disagreements with Gemini's analysis, things to flag for discussion...";
+  // Restore saved notes
+  if(allSegNotes[seg.id])notesTa.value=allSegNotes[seg.id];
+  notesTa.addEventListener("input",()=>{allSegNotes[seg.id]=notesTa.value;saveToStorage()});
+  notesDiv.appendChild(notesTa);
+  main.appendChild(notesDiv);
+
+  // Prev / Next nav
+  const nav=document.createElement("div");nav.className="seg-nav";
+  const prevSeg=segs.find(s=>s.id===segId-1);
+  const nextSeg=segs.find(s=>s.id===segId+1);
+  nav.innerHTML=
+    (prevSeg?'<a href="/validate?session='+encodeURIComponent(sessionId)+'&segment='+prevSeg.id+'">&larr; Prev: '+(LABELS[prevSeg.event_type]||prevSeg.event_type)+'</a>':'<span></span>')+
+    '<a href="/validate?session='+encodeURIComponent(sessionId)+'">All segments</a>'+
+    (nextSeg?'<a href="/validate?session='+encodeURIComponent(sessionId)+'&segment='+nextSeg.id+'">Next: '+(LABELS[nextSeg.event_type]||nextSeg.event_type)+' &rarr;</a>':'<span></span>');
+  main.appendChild(nav);
+
+  // Export single
+  const exp=document.createElement("div");exp.className="export-bar";
+  exp.innerHTML='<button id="btn-exp">Export This Segment (JSON)</button>';
+  main.appendChild(exp);
+  document.getElementById("btn-exp").addEventListener("click",()=>{
+    // Save current chunk's validation before export
+    if(activeChunk>=0)saveChunkVal(activeChunk);
+    const segNotes=document.getElementById("seg-notes")?.value||"";
+    const annotator=document.getElementById("aname")?.value||"anonymous";
+    const out={annotator:annotator,session:sessionId,segment:seg,
+      chunk_results:vlmChunks[seg.id]||{},
+      chunk_validations:allChunkVals,
+      notes:segNotes,exported_at:new Date().toISOString()};
+    const blob=new Blob([JSON.stringify(out,null,2)],{type:"application/json"});
+    const a=document.createElement("a");a.href=URL.createObjectURL(blob);
+    a.download="seg"+seg.id+"_"+new Date().toISOString().slice(0,10)+".json";a.click();
+  });
+}
+
+// ==== VLM Rendering ====
+function renderVLM(d){
+  valDimIdx=0; // reset for fresh validation IDs
+  const w=document.createElement("div");
+  const sr=document.createElement("div");sr.className="score-row";
+  sr.appendChild(sc("Verbal",d.verbal_synchrony));sr.appendChild(sc("Affective",d.affective_synchrony));
+  sr.appendChild(sc("Motor",d.motor_synchrony));
+  // Dyadic state commented out for now
+  // sr.appendChild(sc("Dyadic",d.dyadic_state));
+  w.appendChild(sr);
+  w.appendChild(chb("VERBAL channel",d.verbal_synchrony));
+  w.appendChild(chb("AFFECTIVE channel",d.affective_synchrony));
+  w.appendChild(chb("MOTOR channel",d.motor_synchrony));
+  // w.appendChild(chb("DYADIC STATE (composite)",d.dyadic_state));
+  if(d.robot_intervention_effect)w.appendChild(chb("ROBOT effect (D10)",d.robot_intervention_effect));
+  if(d.clip_summary){const s=document.createElement("div");s.style.cssText="font-size:0.85em;color:var(--muted);margin-top:8px";
+    s.innerHTML="<strong>Summary:</strong> "+esc(d.clip_summary);w.appendChild(s)}
+  if(d.clip_narrative){const n=document.createElement("div");
+    n.style.cssText="font-size:0.9em;line-height:1.5;padding:8px 10px;border-left:3px solid var(--accent);background:rgba(102,176,255,0.08);border-radius:0 6px 6px 0;margin-top:8px";
+    n.textContent=d.clip_narrative;w.appendChild(n)}
+  return w;
+}
+function sc(l,b,dy){
+  const c=document.createElement("div");c.className="score-cell";
+  c.innerHTML='<div class="label">'+l+'</div><div class="value">'+
+    (!b?"—":dy?(b.dominant_state||"—"):((b.sync_score_0_5??b.score_0_5??"—")+"/5"))+
+    '</div><div class="sub">'+(b?((b.confidence_1_5||b.confidence?"conf "+(b.confidence_1_5||b.confidence)+"/5":"")+(b.lead_lag?" · "+b.lead_lag:"")):"")+
+    '</div>';return c}
+let valDimIdx=0; // auto-increment for unique IDs
+function chb(l,b,dy){
+  const dimId=valDimIdx++;
+  const w=document.createElement("div");w.className="ch-block";
+  let h='<div class="ch-head"><strong>'+l+'</strong>';
+  if(b){const s=dy?(b.dominant_state||"—"):(b.sync_score_0_5??b.score_0_5)!=null?
+    "score "+(b.sync_score_0_5??b.score_0_5)+" / 5"+(b.lead_lag?" · lead: "+b.lead_lag:""):"—";
+    h+='<span class="muted">'+s+'</span>'}
+  h+='</div>';w.innerHTML=h;
+  if(!b){w.innerHTML+='<div class="muted">—</div>';return w}
+  const subs=Object.keys(b).filter(k=>k.endsWith("_0_5")&&!["sync_score_0_5","score_0_5","confidence_1_5"].includes(k));
+  if(subs.length){const d=document.createElement("div");d.style.cssText="font-size:0.85em;color:var(--muted)";
+    d.innerHTML="<strong>Sub-anchors:</strong> "+subs.map(k=>k.replace(/_0_5$/,"").replace(/_/g," ")+": <b>"+b[k]+"</b>/5").join(" · ");w.appendChild(d)}
+  const txt=b.justification||b.reasoning||"";
+  if(txt){const j=document.createElement("div");j.style.cssText="padding:4px 0;line-height:1.5;font-size:0.85em";j.textContent=txt;w.appendChild(j)}
+  if(b.per_utterance&&Array.isArray(b.per_utterance)){
+    const t=document.createElement("div");t.style.cssText="font-size:0.85em;color:var(--muted);margin-top:6px";
+    t.innerHTML="<strong>Per-utterance:</strong><br>"+b.per_utterance.map(u=>
+      "<b>L"+u.response_level+"</b> @ "+fmt(u.robot_turn_start_s)+"s: "+esc((u.robot_speech||"").slice(0,80))).join("<br>");
+    w.appendChild(t)}
+
+  // Inline validation for this channel
+  const vr=document.createElement("div");vr.className="val-dim";vr.dataset.dim=dimId;
+  vr.style.cssText="margin-top:10px;padding-top:10px;border-top:1px dashed var(--border)";
+  const vbtns=document.createElement("div");vbtns.className="val-btns";
+  [["good","correct","\u2714 Correct"],["partial","partial","\u25d0 Partially"],["bad","wrong","\u2718 Wrong"]].forEach(([cls,val,txt])=>{
+    const btn=document.createElement("button");btn.className="vbtn "+cls;btn.textContent=txt;
+    btn.addEventListener("click",()=>{vbtns.querySelectorAll(".vbtn").forEach(x=>x.classList.remove("active"));btn.classList.add("active")});
+    vbtns.appendChild(btn)});
+  vr.appendChild(vbtns);
+  const ta=document.createElement("textarea");ta.className="val-comment";
+  ta.placeholder="Comment on "+l+"...";ta.dataset.dim=dimId;
+  vr.appendChild(ta);
+  w.appendChild(vr);
+
+  return w}
+
+function exportAll(){
+  const annotator=document.getElementById("aname")?.value||"anonymous";
+  const out={annotator:annotator,session:sessionId,exported_at:new Date().toISOString(),
+    segments:segs.map(s=>({...s,vlm_result:vlm[s.id]||null,chunk_results:vlmChunks[s.id]||{}})),
+    all_validations:allChunkVals,all_notes:allSegNotes};
+  const blob=new Blob([JSON.stringify(out,null,2)],{type:"application/json"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);
+  a.download="cib_validation_"+annotator+"_"+new Date().toISOString().slice(0,10)+".json";a.click()}
+</script>
+</body>
+</html>
