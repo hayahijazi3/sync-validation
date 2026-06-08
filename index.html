@@ -317,9 +317,18 @@ function renderSingleSegment(segId){
     (seg.description&&seg.description!==seg.trim_reason?'<div style="margin-top:4px">'+seg.description+'</div>':'');
   main.appendChild(hero);
 
-  // Trimmed video — served by /video_segment/<session>/<seg_id>
-  const vid=document.createElement("video");vid.id="vid";vid.controls=true;vid.preload="metadata";
-  vid.src="videos/p01_s01_seg"+seg.id+".mp4";
+  // Video clips hosted on Google Drive
+  const VIDEO_IDS={
+    1:"1pzS_Yooe2gWLhpsbVDwVhAXU7tUb2-ne",
+    2:"1XrXuPZgJ0AXMcnQPfTj9HPN41t9JrNxP",
+    3:"1xYPtfrSPM4ZgL7KMLjBzRK1rjYx4g4XB",
+    4:"17hb4DZ6bF8a1nc5bPJT7JpWx2iaJbgd9",
+    5:"1nLMUBFXyfFF60pO8yjkGXshyFF4VNhDY",
+    6:"1b0eSnf3uZqdQiDVkrYLOWhXRvOCr5I7h",
+    7:"1Gd9HeCUueN_S_PYJ8hwU_Z6T0diJXOu_",
+  };
+  const vid=document.createElement("video");vid.id="vid";vid.controls=true;vid.preload="metadata";vid.crossOrigin="anonymous";
+  vid.src="https://drive.google.com/uc?id="+VIDEO_IDS[seg.id]+"&export=download";
   main.appendChild(vid);
 
   // Chunk progress bar + auto-swapping results
