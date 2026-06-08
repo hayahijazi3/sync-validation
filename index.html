@@ -327,8 +327,10 @@ function renderSingleSegment(segId){
     6:"1b0eSnf3uZqdQiDVkrYLOWhXRvOCr5I7h",
     7:"1Gd9HeCUueN_S_PYJ8hwU_Z6T0diJXOu_",
   };
-  const vid=document.createElement("video");vid.id="vid";vid.controls=true;vid.preload="metadata";vid.crossOrigin="anonymous";
-  vid.src="https://drive.google.com/uc?id="+VIDEO_IDS[seg.id]+"&export=download";
+  // Use iframe with Google Drive preview for reliable video playback
+  const vid=document.createElement("iframe");vid.id="vid";
+  vid.src="https://drive.google.com/file/d/"+VIDEO_IDS[seg.id]+"/preview";
+  vid.setAttribute("allow","autoplay");vid.style.cssText="width:100%;height:50vh;border:none;border-radius:10px;background:#000;margin-bottom:14px";
   main.appendChild(vid);
 
   // Chunk progress bar + auto-swapping results
